@@ -1,0 +1,4 @@
+*.swp
+*.swo
+bochs-src/
+tags
