@@ -30,11 +30,21 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+struct sleeper
+  {
+    struct semaphore sema;
+    int sleep_until_ticks;
+    struct list_elem elem;
+  };
+
+struct list sleepers;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
+  list_init(&sleepers);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -84,16 +94,37 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/* Returns true if value A is less than value B, false
+   otherwise. */
+static bool
+sleep_time_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct sleeper *a = list_entry (a_, struct sleeper, elem);
+  const struct sleeper *b = list_entry (b_, struct sleeper, elem);
+  
+  return a->sleep_until_ticks < b->sleep_until_ticks;
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  struct sleeper s;
+  s.sleep_until_ticks = ticks + start;
+  
+  ASSERT(!intr_context());
+  
+  enum intr_level old_level = intr_disable ();
+  list_push_back(&sleepers, &s.elem);
+  list_sort(&sleepers, sleep_time_less, NULL);
+  sema_init(&s.sema, 0);
+  sema_down(&s.sema);
+  
+  intr_set_level(old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,7 +202,15 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
+  thread_tick (); 
+  if (!list_empty(&sleepers)) {
+    struct list_elem* e = list_begin(&sleepers);
+    struct sleeper* s = list_entry(e, struct sleeper, elem);
+    if (s != NULL && s->sleep_until_ticks < ticks) {
+      sema_up(&s->sema);
+      list_remove(e);
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
