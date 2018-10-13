@@ -202,13 +202,21 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick (); 
+  thread_tick ();
+
   if (!list_empty(&sleepers)) {
-    struct list_elem* e = list_begin(&sleepers);
-    struct sleeper* s = list_entry(e, struct sleeper, elem);
-    if (s != NULL && s->sleep_until_ticks < ticks) {
-      sema_up(&s->sema);
-      list_remove(e);
+    while (true) {
+      if (list_empty(&sleepers)) {
+        break;
+      }
+      struct list_elem* e = list_begin(&sleepers);
+      struct sleeper* s = list_entry(e, struct sleeper, elem);
+      if (s != NULL && s->sleep_until_ticks <= ticks) {
+        sema_up(&s->sema);
+        list_remove(e);
+      } else {
+        break;
+      }
     }
   }
 }
