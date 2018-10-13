@@ -23,9 +23,9 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+//static struct list ready_list;
 
-static struct list* mlfq_lists;
+static struct list mlfq_lists[PRI_MAX+1];
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -71,6 +71,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
+static void sort_mlfq(void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
@@ -89,20 +90,28 @@ static tid_t allocate_tid (void);
    finishes. */
 void
 thread_init (void) 
-{
+{ 
+  //printf("thread_init\n");
   ASSERT (intr_get_level () == INTR_OFF);
-
+  //printf("derp\n");
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  //list_init (&ready_list);
   list_init (&all_list);
-
-  mlfq_lists = malloc(sizeof(struct list) * 64);
+  //printf("list_init\n");
+  //mlfq_lists = calloc(sizeof(struct list), (PRI_MAX+1));
+  //printf("alloc done\n");
+  for (int i = PRI_MIN; i <= PRI_MAX; ++i) {
+    list_init(&mlfq_lists[i]);
+  }
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+  //printf("cp 1\n");
   init_thread (initial_thread, "main", PRI_DEFAULT);
+  //printf("cp 2\n");
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  //printf("thread init done\n");
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -127,8 +136,9 @@ thread_start (void)
 void
 thread_tick (void) 
 {
+  //printf("thread_tick\n");
   struct thread *t = thread_current ();
-
+  //printf("thread_tick done\n");
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -242,7 +252,11 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //list_push_back (&ready_list, &t->elem);
+  //printf("derp1 prio = %d\n", t->priority);
+
+  list_push_back (&mlfq_lists[t->priority], &t->mlfq_elem);
+  //printf("derp1 clean\n");
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -261,12 +275,15 @@ struct thread *
 thread_current (void) 
 {
   struct thread *t = running_thread ();
-  
+  //printf("name = %s", t->name);
   /* Make sure T is really a thread.
      If either of these assertions fire, then your thread may
      have overflowed its stack.  Each thread has less than 4 kB
      of stack, so a few big automatic arrays or moderate
      recursion can cause stack overflow. */
+  if (t->status != THREAD_RUNNING) {
+    PANIC("name = %s prio = %d status = %d\n", t->name, t->priority, t->status);
+  }
   ASSERT (is_thread (t));
   ASSERT (t->status == THREAD_RUNNING);
 
@@ -306,14 +323,18 @@ thread_exit (void)
 void
 thread_yield (void) 
 {
+  //printf("inside thread_yield");
   struct thread *cur = thread_current ();
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread) {
+    //list_push_back (&ready_list, &cur->elem);
+    //printf("derp2\n");
+    list_push_back(&mlfq_lists[cur->priority], &cur->mlfq_elem);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -337,6 +358,7 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 void sort_mlfq(void) {
+  printf("sorting\n");
   for (int i = 0; i < 64; ++i) {
     struct list* l = &mlfq_lists[i];
     struct list_elem* next = NULL;
@@ -355,7 +377,13 @@ void sort_mlfq(void) {
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  //printf("setting prio = %d", new_priority); 
+  struct thread* t = thread_current();
+  if (t->priority != new_priority) {
+    t->priority = new_priority;
+  //  sort_mlfq();
+  }
+  //printf("done\n");
 }
 
 /* Returns the current thread's priority. */
@@ -409,7 +437,9 @@ static void
 idle (void *idle_started_ UNUSED) 
 {
   struct semaphore *idle_started = idle_started_;
+  //printf("idle thread_Current\n");
   idle_thread = thread_current ();
+  //printf("idle done thread_Current\n");
   sema_up (idle_started);
 
   for (;;) 
@@ -510,10 +540,24 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  struct thread* next_thread = NULL;
+  for (int i = PRI_MAX; i >= PRI_MIN; --i) {
+    struct list* l = &mlfq_lists[i];
+    if (!list_empty(l)) {
+      next_thread = list_entry(list_pop_front(l), struct thread, mlfq_elem);
+      break;
+    }
+  }
+  //if (list_empty (&ready_list))
+  //  return idle_thread;
+  //else
+  //  return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  
+  if (next_thread == NULL) {
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  } else {
+    return next_thread;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
