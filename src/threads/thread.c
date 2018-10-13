@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -23,6 +24,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list* mlfq_lists;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -92,6 +95,8 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+
+  mlfq_lists = malloc(sizeof(struct list) * 64);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -329,6 +334,21 @@ thread_foreach (thread_action_func *func, void *aux)
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
     }
+}
+
+void sort_mlfq(void) {
+  for (int i = 0; i < 64; ++i) {
+    struct list* l = &mlfq_lists[i];
+    struct list_elem* next = NULL;
+    for (struct list_elem* e = list_begin(l); e != list_end(l); e = next) {
+      next = list_next(e);
+      struct thread* t = list_entry(e, struct thread, mlfq_elem);
+      if (t->priority != i) {
+        next = list_remove(e);
+      }
+      list_push_back(&mlfq_lists[t->priority], &t->mlfq_elem);
+    }
+  }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
