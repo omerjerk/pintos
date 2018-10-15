@@ -80,7 +80,7 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
-      list_sort(&sema->waiters, priority_more, NULL);
+      //list_sort(&sema->waiters, priority_more, NULL);
       thread_block ();
     }
   sema->value--;
@@ -125,11 +125,17 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
+  if (!list_empty (&sema->waiters)) {
+    list_sort(&sema->waiters, priority_more, NULL);
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+                                struct thread, elem));  
+  } 
+    
   sema->value++;
   intr_set_level (old_level);
+  if (!intr_context()) {
+    thread_yield(); 
+  }
 }
 
 static void sema_test_helper (void *sema_);
@@ -211,16 +217,16 @@ void donate(struct lock* l, int new_priority) {
       d->diff = 0;
     }
 
-      d->l = l;
-      d->diff += new_priority - holder->priority;
-      d->orig_priority = holder->priority;
-       
-      holder->priority = new_priority;
-      sort_mlfq();
-      if (holder->waiting_for_lock != NULL) {
-        donate(holder->waiting_for_lock, new_priority);
-      }
+    d->l = l;
+    d->diff += new_priority - holder->priority;
+    d->orig_priority = holder->priority;
+ 
+    holder->priority = new_priority;
+    sort_mlfq();
+    if (holder->waiting_for_lock != NULL) {
+      donate(holder->waiting_for_lock, new_priority);
     }
+  }
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -250,7 +256,7 @@ lock_acquire (struct lock *lock)
   sema_down (&lock->semaphore);
   t->waiting_for_lock = NULL;
   lock->holder = thread_current ();
-  //thread_yield();
+  thread_yield();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
