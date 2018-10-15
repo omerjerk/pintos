@@ -193,32 +193,33 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
-void donate(struct lock* l, struct thread* donor, int new_priority) {
-    struct thread* holder = l->holder;
-    if (holder->priority < new_priority) {
-      struct donated* d = NULL;
-      for (int i = 0; i < holder->i; ++i) {
-        if (holder->pls[i] == NULL) continue;
-        if (holder->pls[i]->l == l) {
-          d = holder->pls[i];
-        }
+void donate(struct lock* l, int new_priority) {
+  struct thread* holder = l->holder;
+  if (holder->priority < new_priority) {
+    struct donated* d = NULL;
+    for (int i = 0; i < holder->i; ++i) {
+      if (holder->pls[i] == NULL) continue;
+      if (holder->pls[i]->l == l) {
+        d = holder->pls[i];
       }
+    }
       
-      if (d == NULL) {
-        d = malloc(sizeof(struct donated));
-        holder->pls[holder->i] = d;
-        holder->i = holder->i+1;
-        d->diff = 0;
-      }
+    if (d == NULL) {
+      d = malloc(sizeof(struct donated));
+      holder->pls[holder->i] = d;
+      holder->i = holder->i+1;
+      d->diff = 0;
+    }
 
       d->l = l;
       d->diff += new_priority - holder->priority;
-      d->t = donor;
       d->orig_priority = holder->priority;
-      
+       
       holder->priority = new_priority;
-      //holder->remaining_diff += d->diff;
       sort_mlfq();
+      if (holder->waiting_for_lock != NULL) {
+        donate(holder->waiting_for_lock, new_priority);
+      }
     }
 }
 
@@ -242,11 +243,12 @@ lock_acquire (struct lock *lock)
 
   struct thread* holder = lock->holder;
   if (holder != NULL) {
-    donate(lock, t, t->priority);
+    donate(lock, t->priority);
   }
   intr_set_level(old_level);
+  t->waiting_for_lock = lock;
   sema_down (&lock->semaphore);
-
+  t->waiting_for_lock = NULL;
   lock->holder = thread_current ();
   //thread_yield();
 }

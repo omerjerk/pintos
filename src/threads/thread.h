@@ -96,6 +96,7 @@ struct thread
     int remaining_diff;
     struct donated* pls[20];
     int i;
+    struct lock* waiting_for_lock;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
