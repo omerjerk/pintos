@@ -97,6 +97,8 @@ struct thread
     struct donated* pls[20];
     int i;
     struct lock* waiting_for_lock;
+    int donated_count;
+    int lower_priority;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -374,11 +374,14 @@ thread_set_priority (int new_priority)
 {
   //printf("setting prio = %d", new_priority); 
   struct thread* t = thread_current();
+  if (t->priority > new_priority && t->donated_count > 0) {
+    t->lower_priority = new_priority;
+  } else {
   if (t->priority != new_priority) {
     t->priority = new_priority;
     thread_yield();
   }
-  //printf("done\n");
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -512,6 +515,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->remaining_diff = 0;
   t->i = 0;
   t->waiting_for_lock = NULL;
+  t->donated_count = 0;
+  t->lower_priority = -1;
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }

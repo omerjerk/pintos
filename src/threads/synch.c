@@ -57,7 +57,6 @@ priority_more (const struct list_elem *a_, const struct list_elem *b_,
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
-        
   return a->priority > b->priority;
 }
 
@@ -215,6 +214,7 @@ void donate(struct lock* l, int new_priority) {
       holder->pls[holder->i] = d;
       holder->i = holder->i+1;
       d->diff = 0;
+      ++holder->donated_count;
     }
 
     d->l = l;
@@ -301,14 +301,21 @@ lock_release (struct lock *lock)
       }
       if (d->l == lock/* && d->t == next_woken_t*/) {
         holder->pls[i] = NULL;
+        --holder->donated_count;
         //printf("orig = %d diff = %d\n", d->orig_priority, d->diff);
         if ((d->orig_priority + d->diff) >= holder->priority) {   
           holder->priority -= d->diff + holder->remaining_diff;
+          holder->remaining_diff = 0;
           sort_mlfq();
         } else {
           holder->remaining_diff = d->diff;
         }
       }
+    }
+
+    if (holder->donated_count == 0 && holder->lower_priority != -1) {
+      holder->priority = holder->lower_priority;
+      holder->lower_priority = -1;
     }
   
   lock->holder = NULL;
@@ -346,6 +353,19 @@ cond_init (struct condition *cond)
   list_init (&cond->waiters);
 }
 
+static bool
+cond_priority_more (const struct list_elem *a_, const struct list_elem *b_,
+                void *aux UNUSED) 
+{
+  struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
+  struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
+  const struct thread* thread_a = 
+    list_entry(list_front(&a->semaphore.waiters), struct thread, elem);
+  const struct thread* thread_b = 
+    list_entry(list_front(&b->semaphore.waiters), struct thread, elem);
+  return thread_a->priority > thread_b->priority;
+}
+
 /* Atomically releases LOCK and waits for COND to be signaled by
    some other piece of code.  After COND is signaled, LOCK is
    reacquired before returning.  LOCK must be held before calling
@@ -377,7 +397,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  list_push_back(&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -398,9 +418,13 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
+  if (!list_empty (&cond->waiters)) {
+
+    list_sort(&cond->waiters, cond_priority_more, NULL);
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
+  } 
+    
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
