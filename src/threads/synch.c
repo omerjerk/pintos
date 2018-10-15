@@ -31,6 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -48,6 +49,16 @@ sema_init (struct semaphore *sema, unsigned value)
 
   sema->value = value;
   list_init (&sema->waiters);
+}
+
+static bool
+priority_more (const struct list_elem *a_, const struct list_elem *b_,
+                void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+        
+  return a->priority > b->priority;
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -69,6 +80,7 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_sort(&sema->waiters, priority_more, NULL);
       thread_block ();
     }
   sema->value--;
@@ -181,6 +193,35 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+void donate(struct lock* l, struct thread* donor, int new_priority) {
+    struct thread* holder = l->holder;
+    if (holder->priority < new_priority) {
+      struct donated* d = NULL;
+      for (int i = 0; i < holder->i; ++i) {
+        if (holder->pls[i] == NULL) continue;
+        if (holder->pls[i]->l == l) {
+          d = holder->pls[i];
+        }
+      }
+      
+      if (d == NULL) {
+        d = malloc(sizeof(struct donated));
+        holder->pls[holder->i] = d;
+        holder->i = holder->i+1;
+        d->diff = 0;
+      }
+
+      d->l = l;
+      d->diff += new_priority - holder->priority;
+      d->t = donor;
+      d->orig_priority = holder->priority;
+      
+      holder->priority = new_priority;
+      //holder->remaining_diff += d->diff;
+      sort_mlfq();
+    }
+}
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -195,9 +236,19 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+  
+  enum intr_level old_level = intr_disable ();
+  struct thread* t = thread_current();
 
+  struct thread* holder = lock->holder;
+  if (holder != NULL) {
+    donate(lock, t, t->priority);
+  }
+  intr_set_level(old_level);
   sema_down (&lock->semaphore);
+
   lock->holder = thread_current ();
+  //thread_yield();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -230,9 +281,32 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+ 
+  //get the thread which should be woken up
+  enum intr_level old_level = intr_disable ();  
+  
+  struct thread* holder = lock->holder;
+    for (int i = 0; i < holder->i; ++i) {
+      struct donated* d = holder->pls[i];
+      if (d == NULL) {
+        continue;
+      }
+      if (d->l == lock/* && d->t == next_woken_t*/) {
+        holder->pls[i] = NULL;
+        //printf("orig = %d diff = %d\n", d->orig_priority, d->diff);
+        if ((d->orig_priority + d->diff) >= holder->priority) {   
+          holder->priority -= d->diff + holder->remaining_diff;
+          sort_mlfq();
+        } else {
+          holder->remaining_diff = d->diff;
+        }
+      }
+    }
+  
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  intr_set_level(old_level);
+  thread_yield();
 }
 
 /* Returns true if the current thread holds LOCK, false

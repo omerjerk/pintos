@@ -93,6 +93,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem mlfq_elem;
+    int remaining_diff;
+    struct donated* pls[20];
+    int i;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -110,7 +113,7 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
-
+void sort_mlfq(void);
 void thread_tick (void);
 void thread_print_stats (void);
 

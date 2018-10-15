@@ -71,7 +71,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
-static void sort_mlfq(void);
+//static void sort_mlfq(void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
@@ -106,12 +106,9 @@ thread_init (void)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
-  //printf("cp 1\n");
   init_thread (initial_thread, "main", PRI_DEFAULT);
-  //printf("cp 2\n");
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-  //printf("thread init done\n");
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -215,7 +212,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  thread_yield();
   return tid;
 }
 
@@ -258,6 +255,7 @@ thread_unblock (struct thread *t)
   list_push_back (&mlfq_lists[t->priority], &t->mlfq_elem);
   //printf("derp1 clean\n");
   t->status = THREAD_READY;
+  
   intr_set_level (old_level);
 }
 
@@ -323,7 +321,6 @@ thread_exit (void)
 void
 thread_yield (void) 
 {
-  //printf("inside thread_yield");
   struct thread *cur = thread_current ();
   enum intr_level old_level;
   
@@ -358,7 +355,7 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 void sort_mlfq(void) {
-  printf("sorting\n");
+  //printf("sorting\n");
   for (int i = 0; i < 64; ++i) {
     struct list* l = &mlfq_lists[i];
     struct list_elem* next = NULL;
@@ -367,8 +364,9 @@ void sort_mlfq(void) {
       struct thread* t = list_entry(e, struct thread, mlfq_elem);
       if (t->priority != i) {
         next = list_remove(e);
-      }
-      list_push_back(&mlfq_lists[t->priority], &t->mlfq_elem);
+        //printf("moving element to correct position\n");
+        list_push_back(&mlfq_lists[t->priority], &t->mlfq_elem);
+      } 
     }
   }
 }
@@ -381,7 +379,7 @@ thread_set_priority (int new_priority)
   struct thread* t = thread_current();
   if (t->priority != new_priority) {
     t->priority = new_priority;
-  //  sort_mlfq();
+    thread_yield();
   }
   //printf("done\n");
 }
@@ -502,7 +500,6 @@ static void
 init_thread (struct thread *t, const char *name, int priority)
 {
   enum intr_level old_level;
-
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
@@ -515,6 +512,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
+  t->remaining_diff = 0;
+  t->i = 0;
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
