@@ -74,6 +74,7 @@ static void schedule (void);
 //static void sort_mlfq(void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+int compute_mlfqs_priority(struct thread* );
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -106,9 +107,21 @@ thread_init (void)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+  if (thread_mlfqs){
+    initial_thread->nice = 0;
+    initial_thread->recent_cpu = 0;
+    initial_thread->priority = compute_mlfqs_priority(initial_thread);
+  }
+  
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  
+}
+int compute_mlfqs_priority(struct thread *t){
+  int nice = t->nice;
+  int recent_cpu = t->recent_cpu;
+  return PRI_MAX-(recent_cpu/4)-(2*nice);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -146,9 +159,23 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  thread_ticks++;
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
+  t->recent_cpu++;
+  
+  if (thread_mlfqs){
+    if (thread_ticks%4 == 0){
+    //t->priority = compute_mlfqs_priority(t);
+    //sort_mlfq();
+    intr_yield_on_return();
+  }
+  
+  }
+  
+  if (thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  
+
 }
 
 /* Prints thread statistics. */
@@ -192,9 +219,16 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
+  if (thread_mlfqs){
+  struct thread* curr_thread = thread_current();
+    t->nice = curr_thread->nice;
+    t->recent_cpu = curr_thread->recent_cpu;
+    t->priority = compute_mlfqs_priority(t);
+  }
+  
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
+  
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -211,7 +245,10 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
   /* Add to run queue. */
   thread_unblock (t);
+  if (thread_current()->priority < t->priority){
   thread_yield();
+  }
+  
   
   return tid;
 }
@@ -372,6 +409,9 @@ void sort_mlfq(void) {
 void
 thread_set_priority (int new_priority) 
 {
+  if (thread_mlfqs){
+    return;
+  }
   //printf("setting prio = %d", new_priority); 
   struct thread* t = thread_current();
   if (t->priority > new_priority && t->donated_count > 0) {
@@ -393,8 +433,10 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
+   thread_current()->nice = nice;
+
   /* Not yet implemented. */
 }
 
@@ -403,7 +445,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -508,7 +550,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  if (!thread_mlfqs){
+    t->priority = priority;    
+  }
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
