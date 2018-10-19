@@ -244,14 +244,14 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   
-  enum intr_level old_level = intr_disable ();
+  //enum intr_level old_level = intr_disable ();
   struct thread* t = thread_current();
 
   struct thread* holder = lock->holder;
   if (holder != NULL) {
     donate(lock, t->priority);
   }
-  intr_set_level(old_level);
+  //intr_set_level(old_level);
   t->waiting_for_lock = lock;
   sema_down (&lock->semaphore);
   t->waiting_for_lock = NULL;
@@ -291,7 +291,7 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
  
   //get the thread which should be woken up
-  enum intr_level old_level = intr_disable ();  
+  //enum intr_level old_level = intr_disable ();  
   
   struct thread* holder = lock->holder;
     for (int i = 0; i < holder->i; ++i) {
@@ -320,7 +320,7 @@ lock_release (struct lock *lock)
   
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  intr_set_level(old_level);
+  //intr_set_level(old_level);
   thread_yield();
 }
 
