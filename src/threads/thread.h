@@ -99,6 +99,8 @@ struct thread
     struct lock* waiting_for_lock;
     int donated_count;
     int lower_priority;
+    int nice;
+    int recent_cpu;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
