@@ -118,10 +118,18 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
   
 }
+
 int compute_mlfqs_priority(struct thread *t){
   int nice = t->nice;
   int recent_cpu = t->recent_cpu;
-  return PRI_MAX-(recent_cpu/4)-(2*nice);
+  int p = PRI_MAX-(recent_cpu/4)-(2*nice);
+  if (p < PRI_MIN) {
+    p = PRI_MIN;
+  }
+  if (p > PRI_MAX) {
+    p = PRI_MAX;
+  }
+  return p;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -164,9 +172,10 @@ thread_tick (void)
   t->recent_cpu++;
   
   if (thread_mlfqs){
-    if (thread_ticks%4 == 0){
-    //t->priority = compute_mlfqs_priority(t);
-    //sort_mlfq();
+    if (thread_ticks%4 == 0) {
+    t->priority = compute_mlfqs_priority(t);
+    //printf("computed priority = %d\n", t->priority);
+    sort_mlfq();
     intr_yield_on_return();
   }
   
@@ -246,7 +255,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
   if (thread_current()->priority < t->priority){
-  thread_yield();
+    thread_yield();
   }
   
   
