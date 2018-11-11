@@ -13,8 +13,19 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
-  printf ("system call!\n");
+  int call_id = *((int*) f->esp);
+  if (call_id == 9) {
+    f->esp += 4;
+    printf("first arg = %d\n", *((int*) f->esp));
+    f->esp += 4;
+    printf("arg value = %s\n",  *((char**)f->esp));
+    f->esp += 4;
+    printf("third arg = %d\n", *((int*) f->esp));
+  } else {
+    printf("unsupported system call\n");
+  }
+  
   thread_exit ();
 }

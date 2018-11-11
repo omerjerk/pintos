@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "lib/string.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -36,7 +37,7 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name, PGSIZE); 
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -195,7 +196,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char* args[10], uint32_t argCount);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -221,8 +222,31 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  char* fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+  char *token, *save_ptr;
+
+  int flag = 0;
+  char* progName;
+  char* args[10];
+  uint32_t argCount = 0;
+
+  for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr)) {
+    printf ("'%s'\n", token); 
+    if (flag == 0) {
+      progName = token;
+      flag = 1;
+    } else {
+      args[argCount++] = token;
+    }
+  }
+     
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (progName);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -302,7 +326,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, args, argCount))
     goto done;
 
   /* Start address. */
@@ -427,7 +451,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char* args[10], uint32_t argCount) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -436,9 +460,42 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success) {
         *esp = PHYS_BASE;
-      else
+        int tl = 0;
+        char** asses[10];
+        for (int i = argCount-1; i >= 0; --i) {
+          int l = strlen(args[i]);
+          *esp -= l+1;
+          for (int j = 0; j < l; ++j) {
+            *((char*) *esp) = args[i][j];
+            *esp += 1;
+          }
+          *((char*) *esp) = '\0';
+          *esp -= l+1;
+          asses[i] = *esp+1;
+          tl += l+1;
+        }
+        if (tl % 4 != 0) {
+          int p = tl / 4;
+          for (int i = 0; i < p; ++i) {
+            *((char*) *esp) = 0;
+            *esp -= 1;
+          }
+        }
+        *((char*) *esp) = 0;
+        for (int i = argCount-1; i >= 0; --i) {
+          *esp -= 3;
+          *((uint32_t*) *esp) = asses[i];
+          *esp -= 1;
+        }
+        *((uint32_t*)(*esp - 3)) = *esp+1;
+        *esp -= 4;
+        *((uint32_t*) (*esp - 3)) = argCount;
+        *esp -= 4;
+        *((uint32_t*) (*esp - 3)) = 0;
+        *esp -= 3;
+      } else
         palloc_free_page (kpage);
     }
   return success;
