@@ -89,6 +89,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while (true) {
+ 
+  }
   return -1;
 }
 
@@ -115,6 +118,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  printf ("%s: exit(%d)\n", cur->name, 0);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -239,9 +243,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
     if (flag == 0) {
       progName = token;
       flag = 1;
-    } else {
-      args[argCount++] = token;
     }
+    args[argCount++] = token;
   }
      
 

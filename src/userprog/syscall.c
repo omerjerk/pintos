@@ -15,17 +15,21 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int call_id = *((int*) f->esp);
+  void *esp = f->esp;
+  printf("syscall handler begin\n");
+  int call_id = *((int*) esp);
   if (call_id == 9) {
-    f->esp += 4;
-    printf("first arg = %d\n", *((int*) f->esp));
-    f->esp += 4;
-    printf("arg value = %s\n",  *((char**)f->esp));
-    f->esp += 4;
-    printf("third arg = %d\n", *((int*) f->esp));
+    esp += 4;
+    printf("first arg = %d\n", *((int*) esp));
+    esp += 4;
+    printf("arg value = %s\n",  *((char**)esp));
+    esp += 4;
+    int third = *((int*) esp);
+    f->eax = third;
+    printf("third arg = %d\n", third);
   } else {
     printf("unsupported system call\n");
   }
-  
-  thread_exit ();
+  printf("finish\n"); 
+  //thread_exit ();
 }
