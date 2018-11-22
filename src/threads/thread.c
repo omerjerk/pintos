@@ -331,6 +331,19 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/*proj2 code*/
+struct thread* get_thread_by_id(tid_t tid) {
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    struct thread* t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid) {
+      return t;
+    }
+  }
+  printf("thread with tid = %d not found!!\n", tid);
+  return NULL;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
@@ -467,6 +480,9 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
+
+  /*proj2 code*/
+  sema_init(&t->parent_sema, 0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

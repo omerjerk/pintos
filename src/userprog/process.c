@@ -37,10 +37,18 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE); 
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  char *token, *save_ptr;
+  char* progName;
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr)) {
+      progName = token;
+      break;
+  }
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (progName, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -89,8 +97,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while (true) {
- 
+  struct thread* child = get_thread_by_id(child_tid);
+  if (!child->is_parent_waiting) {
+    child->is_parent_waiting = 1;
+    sema_down(&child->parent_sema);
   }
   return -1;
 }
@@ -101,6 +111,11 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  if (cur->is_parent_waiting) {
+    sema_up(&cur->parent_sema);
+    cur->is_parent_waiting = 0;
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -239,7 +254,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
         token = strtok_r (NULL, " ", &save_ptr)) {
-    printf ("'%s'\n", token); 
+    //printf ("'%s'\n", token); 
     if (flag == 0) {
       progName = token;
       flag = 1;
