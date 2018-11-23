@@ -490,29 +490,29 @@ setup_stack (void **esp, char* args[10], uint32_t argCount)
             *esp += 1;
           }
           *((char*) *esp) = '\0';
-          *esp -= l+1;
-          asses[i] = *esp+1;
+          *esp -= l;
+          asses[i] = *esp;
           tl += l+1;
         }
         if (tl % 4 != 0) {
           int p = tl / 4;
           for (int i = 0; i < p; ++i) {
-            *((char*) *esp) = 0;
             *esp -= 1;
+            *((char*) *esp) = 0;
           }
         }
+        *esp -= 4;
         *((char*) *esp) = 0;
         for (int i = argCount-1; i >= 0; --i) {
-          *esp -= 3;
+          *esp -= 4;
           *((uint32_t*) *esp) = asses[i];
-          *esp -= 1;
         }
-        *((uint32_t*)(*esp - 3)) = *esp+1;
         *esp -= 4;
-        *((uint32_t*) (*esp - 3)) = argCount;
+        *((uint32_t*)(*esp)) = *esp+4;
         *esp -= 4;
-        *((uint32_t*) (*esp - 3)) = 0;
-        *esp -= 3;
+        *((uint32_t*) (*esp)) = argCount;
+        *esp -= 4;
+        *((uint32_t*) (*esp)) = 0;
       } else
         palloc_free_page (kpage);
     }
