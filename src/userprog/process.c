@@ -215,7 +215,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, char* args[10], uint32_t argCount);
+static bool setup_stack (void **esp, char* args[25], uint32_t argCount);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -249,7 +249,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   int flag = 0;
   char* progName;
-  char* args[10];
+  char* args[25];
   uint32_t argCount = 0;
 
   for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
@@ -469,7 +469,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, char* args[10], uint32_t argCount) 
+setup_stack (void **esp, char* args[25], uint32_t argCount)
 {
   uint8_t *kpage;
   bool success = false;
@@ -481,7 +481,7 @@ setup_stack (void **esp, char* args[10], uint32_t argCount)
       if (success) {
         *esp = PHYS_BASE;
         int tl = 0;
-        char** asses[10];
+        char** asses[25];
         for (int i = argCount-1; i >= 0; --i) {
           int l = strlen(args[i]);
           *esp -= l+1;
