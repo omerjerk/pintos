@@ -102,6 +102,7 @@ process_wait (tid_t child_tid)
     if (!child->is_parent_waiting) {
       child->is_parent_waiting = 1;
       sema_down(&child->parent_sema);
+      return child->exit_code;
     }
   } else {
     struct thread* t = thread_current();

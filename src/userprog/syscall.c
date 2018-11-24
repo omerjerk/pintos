@@ -8,7 +8,8 @@
 
 static void syscall_handler (struct intr_frame *);
 static void sys_exit(void* esp);
-static void sys_wait(void* esp);
+static int sys_wait(void* esp);
+static int sys_exec(void* esp);
 
 void
 syscall_init (void) 
@@ -36,7 +37,9 @@ syscall_handler (struct intr_frame *f)
   } else if (call_id == SYS_HALT) {
     shutdown_power_off();
   } else if (call_id == SYS_WAIT) {
-    sys_wait(esp);
+    f->eax = sys_wait(esp);
+  } else if (call_id == SYS_EXEC) {
+    f->eax = sys_exec(esp);
   } else {
     printf("Unsupported system call, exiting\n");
     thread_exit();
@@ -52,11 +55,17 @@ static void sys_exit(void* esp) {
   thread_exit();
 }
 
-static void sys_wait(void* esp) {
-  esp += 4;
+static int sys_wait(void* esp) {
+  //esp += 4;
   tid_t child_id = *((int*) esp);
   int status = process_wait(child_id);
   if (status == -1) {
     thread_exit();
   }
+  return status;
+}
+
+static int sys_exec(void* esp) {
+  const char* cmdline = *((char**) esp);
+  return process_execute(cmdline);
 }
