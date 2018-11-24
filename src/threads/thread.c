@@ -340,7 +340,6 @@ struct thread* get_thread_by_id(tid_t tid) {
       return t;
     }
   }
-  printf("thread with tid = %d not found!!\n", tid);
   return NULL;
 }
 

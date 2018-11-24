@@ -4,9 +4,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
-static void sys_exit(struct intr_frame* f);
+static void sys_exit(void* esp);
+static void sys_wait(void* esp);
 
 void
 syscall_init (void) 
@@ -18,10 +20,10 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
   void *esp = f->esp;
-  //printf("syscall handler begin\n");
   int call_id = *((int*) esp);
+  esp += 4;
+  //printf("call_id = %d\n", call_id);
   if (call_id == SYS_WRITE) {
-    esp += 4;
     //printf("first arg = %d\n", *((int*) esp));
     esp += 4;
     printf("%s",  *((char**)esp));
@@ -30,9 +32,11 @@ syscall_handler (struct intr_frame *f)
     f->eax = third;
     //printf("third arg = %d\n", third);
   } else if (call_id == SYS_EXIT) {
-    sys_exit(f);
+    sys_exit(esp);
   } else if (call_id == SYS_HALT) {
     shutdown_power_off();
+  } else if (call_id == SYS_WAIT) {
+    sys_wait(esp);
   } else {
     printf("Unsupported system call, exiting\n");
     thread_exit();
@@ -41,11 +45,18 @@ syscall_handler (struct intr_frame *f)
   //thread_exit ();
 }
 
-static void sys_exit(struct intr_frame* f) {
-  void* esp = f->esp;
-  esp += 4;
+static void sys_exit(void* esp) {
   int exit_code = *((int*)esp);
   struct thread* t = thread_current();
   t->exit_code = exit_code;
   thread_exit();
+}
+
+static void sys_wait(void* esp) {
+  esp += 4;
+  tid_t child_id = *((int*) esp);
+  int status = process_wait(child_id);
+  if (status == -1) {
+    thread_exit();
+  }
 }
