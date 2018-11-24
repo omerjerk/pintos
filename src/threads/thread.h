@@ -98,6 +98,7 @@ struct thread
     struct semaphore parent_sema;
     tid_t parent_tid;
     bool is_parent_waiting;
+    int exit_code;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -6,6 +6,7 @@
 #include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
+static void sys_exit(struct intr_frame* f);
 
 void
 syscall_init (void) 
@@ -29,7 +30,7 @@ syscall_handler (struct intr_frame *f)
     f->eax = third;
     //printf("third arg = %d\n", third);
   } else if (call_id == SYS_EXIT) {
-    thread_exit();
+    sys_exit(f);
   } else if (call_id == SYS_HALT) {
     shutdown_power_off();
   } else {
@@ -38,4 +39,13 @@ syscall_handler (struct intr_frame *f)
   }
   //printf("finish\n"); 
   //thread_exit ();
+}
+
+static void sys_exit(struct intr_frame* f) {
+  void* esp = f->esp;
+  esp += 4;
+  int exit_code = *((int*)esp);
+  struct thread* t = thread_current();
+  t->exit_code = exit_code;
+  thread_exit();
 }
