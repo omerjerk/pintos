@@ -98,6 +98,8 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->exit_code = 0;
+  initial_thread->next_fd = 2;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -180,6 +182,8 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
+  t->exit_code = 0;
+  t->next_fd = 2;
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 

@@ -99,10 +99,12 @@ struct thread
     tid_t parent_tid;
     bool is_parent_waiting;
     int exit_code;
-
+    struct file* fd_to_file[10];
+    int next_fd;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;  /* Page directory. */
+    
 #endif
 
     /* Owned by thread.c. */
