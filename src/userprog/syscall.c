@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -29,6 +30,8 @@ syscall_handler (struct intr_frame *f)
     //printf("third arg = %d\n", third);
   } else if (call_id == SYS_EXIT) {
     thread_exit();
+  } else if (call_id == SYS_HALT) {
+    shutdown_power_off();
   } else {
     printf("Unsupported system call, exiting\n");
     thread_exit();
