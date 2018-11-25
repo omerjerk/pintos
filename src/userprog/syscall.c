@@ -7,6 +7,8 @@
 #include "userprog/process.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -24,6 +26,16 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 
+static bool is_addr_ok(const void* addr) {
+    if (is_user_vaddr(addr)) {
+      struct thread* curr = thread_current();
+      if (pagedir_get_page(curr->pagedir, addr) != NULL) {
+        return true;
+      }
+    }
+    return false;
+}
+
 void
 syscall_init (void) 
 {
@@ -36,6 +48,9 @@ syscall_handler (struct intr_frame *f)
   void *esp = f->esp;
   int call_id = *((int*) esp);
   esp += 4;
+  if (!is_addr_ok(esp)) {
+    exit(-1);
+  }
   if (call_id == SYS_WRITE) {
     int fd = *((int*) esp);
     esp += 4;
@@ -44,8 +59,7 @@ syscall_handler (struct intr_frame *f)
     int length = *((int*)esp);
     int num_of_bytes_written = write(fd,string_to_write,length);
     f->eax = num_of_bytes_written;
-  }
-  else if (call_id == SYS_CREATE){
+  } else if (call_id == SYS_CREATE){
     char* file_name = *((char**)esp);
     esp += 4;
     unsigned initial_size = *((unsigned*)esp);
@@ -74,6 +88,7 @@ syscall_handler (struct intr_frame *f)
     thread_exit();
   }
 }
+
 
 
 bool create (const char *file, unsigned initial_size){
@@ -141,6 +156,6 @@ static int wait(tid_t child_id) {
   return status;
 }
 
-static int exec(const char* cmdline) { 
+static int exec(const char* cmdline) {
   return process_execute(cmdline);
 }
