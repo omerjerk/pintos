@@ -10,7 +10,9 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/off_t.h"
-
+#include "userprog/exception.h"
+#define MAX_FD 100
+#define MIN_FD 2
 static void syscall_handler (struct intr_frame *);
 
 void halt (void) NO_RETURN;
@@ -45,6 +47,7 @@ static bool check_next_four_addrs(const void* esp) {
   return true;
 }
 
+
 void
 syscall_init (void) 
 {
@@ -63,7 +66,6 @@ syscall_handler (struct intr_frame *f)
   esp += 4;
 
   if (call_id == SYS_WRITE) {
-
     int fd = *((int*) esp);
     esp += 4;
     char *string_to_write = *((char**)esp);
@@ -96,7 +98,13 @@ syscall_handler (struct intr_frame *f)
     esp += 4;
     unsigned size = *((unsigned*)esp);
     f->eax = read(fd,buf,size);
-  } else if (call_id == SYS_EXIT) {
+  } else if(call_id == SYS_SEEK){
+    int fd = *((int*)esp);
+    esp += 4;
+    unsigned position = *((unsigned*)esp);
+    seek(fd, position);
+  }
+  else if (call_id == SYS_EXIT) {
     int exit_code = *((int*)esp);
     exit(exit_code);
   } else if (call_id == SYS_HALT) {
@@ -117,7 +125,7 @@ syscall_handler (struct intr_frame *f)
 }
 
 struct file* get_file_from_fd(int fd){
-  if (fd < 2 || fd >= 10|| fd == NULL){
+  if (fd < MIN_FD || fd > MAX_FD|| fd == NULL){
     exit(-1);
   }
   struct thread* cur = thread_current();
@@ -128,9 +136,14 @@ struct file* get_file_from_fd(int fd){
   return fp;
 }
 
-
+void initialize_fd(struct thread* t){
+  t->next_fd = 2;
+    for(int fd=0;fd<=MAX_FD;fd++){
+      t->fd_to_file[fd] = NULL;
+  }
+}
 bool create (const char *file, unsigned initial_size){
-  if (file == NULL){
+  if (file == NULL||!check_next_four_addrs(file)){
     exit(-1);
   }
   bool status = filesys_create (file,initial_size);
@@ -138,16 +151,15 @@ bool create (const char *file, unsigned initial_size){
 }
 
 int open (const char *file_name){
-if (file_name == NULL){
+if (file_name == NULL ){
   return -1;
 }
+if( !check_next_four_addrs(file_name)){
+  exit(-1);
+}
 struct thread *cur = thread_current();
-if (cur->next_fd >= 10 || cur->next_fd < 2){
-  cur->next_fd = 2;
-  int i = 0;
-    for(i=0;i<10;i++){
-      cur->fd_to_file[i] = NULL;
-  }
+if (cur->next_fd == 0){
+  initialize_fd(cur);
 }
 struct file* fp = filesys_open(file_name);
 if (fp ==NULL){
@@ -171,6 +183,9 @@ void close(int fd){
 }
 
 int read (int fd, char *buffer, unsigned size){
+   if (buffer == NULL ||!check_next_four_addrs(buffer)){
+      exit(-1);
+    }
    if (fd == 0){
     char* string_to_read = (char*)buffer;
     return size;
@@ -182,14 +197,21 @@ int read (int fd, char *buffer, unsigned size){
 }
 
 int write (int fd, const void *buffer, unsigned size){ 
-  if (fd == 1){
-    char *string_to_write = (char*)buffer;
-    printf("%s",string_to_write);
-    return size;
+   if (buffer == NULL ||!check_next_four_addrs(buffer)){
+      exit(-1);
+    }
+   if (fd == 1){
+     char *string_to_write = (char*)buffer;
+     printf("%s",string_to_write);
+     return size;
   }
   struct file* fp = get_file_from_fd(fd);
   int bytes_written = file_write(fp,buffer,size);
   return bytes_written;
+}
+void seek(int fd,unsigned position){
+  struct file* fp = get_file_from_fd(fd);
+  file_seek(fp,position);  
 }
 
 static void exit(int exit_code) { 
