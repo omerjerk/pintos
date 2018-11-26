@@ -58,7 +58,21 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   if (get_thread_by_id(tid) == NULL) {
-    return get_exit_code_by_id(tid);
+    int return_status = get_exit_code_by_id(tid, false);
+    if (return_status == -5) {
+      /*load failed*/
+      return -1;
+    }
+    //printf("returning %d from execute\n", return_status);
+    //if (return_status == -1) {
+    //  return -1;
+    //} else {
+    //  return tid;
+    //}
+  } else {
+    if (child_thread->exit_code == -5) {
+      return -1;
+    }
   }
   return tid;
 }
@@ -106,18 +120,16 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  //printf("child id = %d\n", child_tid);
   struct thread* child = get_thread_by_id(child_tid);
   if (child != NULL) {
     if (!child->is_parent_waiting) {
       child->is_parent_waiting = 1;
       sema_down(&child->parent_sema);
-      //printf("name = %s code = %d\n", child->name, child->exit_code);
-      return get_exit_code_by_id(child_tid);
+      return get_exit_code_by_id(child_tid, true);
     }
   } else {
-    struct thread* t = thread_current();
-    t->exit_code = -1;
-    return t->exit_code;
+    return get_exit_code_by_id(child_tid, true);
   }
   return -1;
 }
@@ -286,9 +298,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
-      t->exit_code = -1;
+      t->exit_code = -5;
+      add_exit_code(t->tid, -5);
+      sema_up(&t->parent_exec_sema);
       goto done; 
     }
+  t->exit_code = 0;
+  sema_up(&t->parent_exec_sema);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -378,7 +394,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     t->exit_code = -1;
     add_exit_code(t->tid, -1);
   }
-  sema_up(&t->parent_exec_sema);
+  
   return success;
 }
 

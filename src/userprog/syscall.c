@@ -103,6 +103,9 @@ syscall_handler (struct intr_frame *f)
     tid_t child_id = *((int*) esp);
     f->eax = wait(child_id);
   } else if (call_id == SYS_EXEC) {
+    if (!check_next_four_addrs(esp)) {
+      exit(-1);
+    }
     const char* cmdline = *((char**) esp);
     if (!check_next_four_addrs(cmdline)) {
       exit(-1);
@@ -198,8 +201,10 @@ static void exit(int exit_code) {
 
 static int wait(tid_t child_id) { 
   int status = process_wait(child_id);
-  if (status == -1) {
-    //thread_exit();
+  if (status == -2) {
+    struct thread* t = thread_current();
+    t->exit_code = -1;
+    thread_exit();
   }
   return status;
 }

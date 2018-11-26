@@ -354,16 +354,20 @@ struct thread* get_thread_by_id(tid_t tid) {
   return NULL;
 }
 
-int get_exit_code_by_id(tid_t tid) {
+int get_exit_code_by_id(tid_t tid, bool mark) {
   struct list_elem *e;
   for (e = list_begin(&exit_code_list); e != list_end(&exit_code_list); e = list_next(e)) {
     struct tid_exit_code* x = list_entry(e, struct tid_exit_code, elem);
     if (x->tid == tid) {
-      return x->exit_code;
+      int exit_code = x->exit_code;
+      if (mark) {
+        x->exit_code = -1;
+      } 
+      return exit_code;
     }
   }
-  printf("we should never reach here!!!!!\n");
-  return 0;
+  //printf("we should never reach here!!!!!\n");
+  return -2;
 }
 
 void add_exit_code(tid_t tid, int exit_code) {
