@@ -78,7 +78,11 @@ syscall_handler (struct intr_frame *f)
     unsigned initial_size = *((unsigned*)esp);
     bool status = create(file_name,initial_size);
     f->eax = status;
-  } else if (call_id == SYS_OPEN){
+  } else if (call_id == SYS_REMOVE){
+    char* file_name = *((char**)esp);
+    f->eax = remove(file_name);
+  } 
+  else if (call_id == SYS_OPEN){
     char* file_name = *((char**)esp);
     int fd = open(file_name);
     f->eax = fd;
@@ -149,6 +153,12 @@ bool create (const char *file, unsigned initial_size){
   }
   bool status = filesys_create (file,initial_size);
   return status;
+}
+bool remove (const char *file){
+  if (file == NULL||!check_next_four_addrs(file)){
+    exit(-1);
+  }
+  return filesys_remove(file);
 }
 
 int open (const char *file_name){
