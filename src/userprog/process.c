@@ -265,11 +265,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  printf("check1\n");
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
+  printf("check 2\n");
 
   char* fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)

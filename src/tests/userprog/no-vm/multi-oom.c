@@ -37,6 +37,7 @@ static pid_t
 spawn_child (int c, enum child_termination_mode mode)
 {
   char child_cmd[128];
+  msg("spawning");
   snprintf (child_cmd, sizeof child_cmd,
             "%s %d %s", test_name, c, mode == CRASH ? "-k" : "");
   return exec (child_cmd);

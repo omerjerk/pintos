@@ -191,7 +191,6 @@ int read (int fd, char *buffer, unsigned size){
       exit(-1);
     }
    if (fd == 0){
-    char* string_to_read = (char*)buffer;
     return size;
   }
   struct file* fp = get_file_from_fd(fd);
@@ -213,6 +212,7 @@ int write (int fd, const void *buffer, unsigned size){
   int bytes_written = file_write(fp,buffer,size);
   return bytes_written;
 }
+
 void seek(int fd,unsigned position){
   struct file* fp = get_file_from_fd(fd);
   file_seek(fp,position);  
