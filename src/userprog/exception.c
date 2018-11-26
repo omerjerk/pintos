@@ -4,12 +4,23 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+#include "threads/vaddr.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+static bool is_addr_ok(const void* addr);
+
+static bool is_addr_ok(const void* addr) {
+    if (is_user_vaddr(addr)) {
+      struct thread* curr = thread_current();
+      if (pagedir_get_page(curr->pagedir, addr) != NULL) {
+        return true;
+      }
+    }
+    return false;
+}
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -135,6 +146,7 @@ page_fault (struct intr_frame *f)
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
+  
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
@@ -147,7 +159,8 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+  
+  
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -156,6 +169,13 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
+  
+
+  if (fault_addr == NULL ||!is_addr_ok(fault_addr)){
+    struct thread* cur = thread_current();
+    cur->exit_code = -1;
+    thread_exit();
+  }
   kill (f);
 }
 
