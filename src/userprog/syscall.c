@@ -36,6 +36,14 @@ static bool is_addr_ok(const void* addr) {
     return false;
 }
 
+static bool check_next_four_addrs(const void* esp) {
+  if (!is_addr_ok(esp) || !is_addr_ok(esp+1)
+      || !is_addr_ok(esp+2) || !is_addr_ok(esp+3)) {
+    return false;
+  }
+  return true;
+}
+
 void
 syscall_init (void) 
 {
@@ -47,13 +55,12 @@ syscall_handler (struct intr_frame *f)
 {
   //printf("begin\n");
   void *esp = f->esp;
-  if (!is_addr_ok(esp) || !is_addr_ok(esp+1) 
-      || !is_addr_ok(esp+2) || !is_addr_ok(esp+3)) {
+  if (!check_next_four_addrs(esp)) {
     exit(-1);
   }
   int call_id = *((int*) esp);
   esp += 4;
-  
+
   if (call_id == SYS_WRITE) {
     int fd = *((int*) esp);
     esp += 4;
@@ -86,6 +93,9 @@ syscall_handler (struct intr_frame *f)
     f->eax = wait(child_id);
   } else if (call_id == SYS_EXEC) {
     const char* cmdline = *((char**) esp);
+    if (!check_next_four_addrs(cmdline)) {
+      exit(-1);
+    }
     f->eax = exec(cmdline); 
   } else {
     printf("Unsupported system call, exiting\n");
