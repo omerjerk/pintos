@@ -53,8 +53,13 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (progName, PRI_DEFAULT, start_process, fn_copy);
+  struct thread* child_thread = get_thread_by_id(tid);
+  sema_down(&child_thread->parent_exec_sema);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+  if (get_thread_by_id(tid) == NULL) {
+    return get_exit_code_by_id(tid);
+  }
   return tid;
 }
 
@@ -281,6 +286,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
+      t->exit_code = -1;
       goto done; 
     }
 
@@ -368,6 +374,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  if (!success) {
+    t->exit_code = -1;
+    add_exit_code(t->tid, -1);
+  }
+  sema_up(&t->parent_exec_sema);
   return success;
 }
 

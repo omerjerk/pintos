@@ -512,6 +512,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /*proj2 code*/
   sema_init(&t->parent_sema, 0);
+  sema_init(&t->parent_exec_sema, 0);
   t->exit_code = 0; //0 is the default exit code unless modified
 }
 

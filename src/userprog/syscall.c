@@ -54,7 +54,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  //printf("begin\n");
   void *esp = f->esp;
   if (!check_next_four_addrs(esp)) {
     exit(-1);
@@ -69,7 +68,6 @@ syscall_handler (struct intr_frame *f)
     char *string_to_write = *((char**)esp);
     esp += 4;
     int length = *((int*)esp);
-    //printf("writing\n");
     int num_of_bytes_written = write(fd,string_to_write,length);
     f->eax = num_of_bytes_written;
   } else if (call_id == SYS_CREATE){

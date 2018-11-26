@@ -96,6 +96,7 @@ struct thread
 
     /*items for proj2*/
     struct semaphore parent_sema;
+    struct semaphore parent_exec_sema;
     tid_t parent_tid;
     bool is_parent_waiting;
     int exit_code;
