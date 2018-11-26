@@ -106,7 +106,8 @@ process_wait (tid_t child_tid)
     if (!child->is_parent_waiting) {
       child->is_parent_waiting = 1;
       sema_down(&child->parent_sema);
-      return child->exit_code;
+      //printf("name = %s code = %d\n", child->name, child->exit_code);
+      return get_exit_code_by_id(child_tid);
     }
   } else {
     struct thread* t = thread_current();
@@ -144,6 +145,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  add_exit_code(cur->tid, cur->exit_code);
   printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
 }
 

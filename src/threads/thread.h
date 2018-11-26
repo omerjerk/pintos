@@ -148,6 +148,13 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 /*proj2 code*/
+struct tid_exit_code {
+  struct list_elem elem;
+  tid_t tid;
+  int exit_code;
+};
 struct thread* get_thread_by_id(tid_t tid);
+int get_exit_code_by_id(tid_t tid);
+void add_exit_code(tid_t tid, int exit_code);
 
 #endif /* threads/thread.h */

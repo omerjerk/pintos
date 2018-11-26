@@ -45,18 +45,22 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
+  //printf("begin\n");
   void *esp = f->esp;
-  int call_id = *((int*) esp);
-  esp += 4;
-  if (!is_addr_ok(esp)) {
+  if (!is_addr_ok(esp) || !is_addr_ok(esp+1) 
+      || !is_addr_ok(esp+2) || !is_addr_ok(esp+3)) {
     exit(-1);
   }
+  int call_id = *((int*) esp);
+  esp += 4;
+  
   if (call_id == SYS_WRITE) {
     int fd = *((int*) esp);
     esp += 4;
     char *string_to_write = *((char**)esp);
     esp += 4;
     int length = *((int*)esp);
+    //printf("writing\n");
     int num_of_bytes_written = write(fd,string_to_write,length);
     f->eax = num_of_bytes_written;
   } else if (call_id == SYS_CREATE){
@@ -151,7 +155,7 @@ static void exit(int exit_code) {
 static int wait(tid_t child_id) { 
   int status = process_wait(child_id);
   if (status == -1) {
-    thread_exit();
+    //thread_exit();
   }
   return status;
 }

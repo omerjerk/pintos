@@ -14,6 +14,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "threads/malloc.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -27,6 +28,9 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+//added for proj2
+static struct list exit_code_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -92,6 +96,9 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+
+  /*proj 2 code*/
+  list_init(&exit_code_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -345,6 +352,25 @@ struct thread* get_thread_by_id(tid_t tid) {
     }
   }
   return NULL;
+}
+
+int get_exit_code_by_id(tid_t tid) {
+  struct list_elem *e;
+  for (e = list_begin(&exit_code_list); e != list_end(&exit_code_list); e = list_next(e)) {
+    struct tid_exit_code* x = list_entry(e, struct tid_exit_code, elem);
+    if (x->tid == tid) {
+      return x->exit_code;
+    }
+  }
+  printf("we should never reach here!!!!!\n");
+  return 0;
+}
+
+void add_exit_code(tid_t tid, int exit_code) {
+  struct tid_exit_code* x = malloc(sizeof(struct tid_exit_code));
+  x->tid = tid;
+  x->exit_code = exit_code;
+  list_push_back (&exit_code_list, &x->elem);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
