@@ -103,6 +103,9 @@ syscall_handler (struct intr_frame *f)
     seek(fd, position);
   }
   else if (call_id == SYS_EXIT) {
+    if (!check_next_four_addrs(esp)) {
+      exit(-1);
+    }
     int exit_code = *((int*)esp);
     exit(exit_code);
   } else if (call_id == SYS_HALT) {
