@@ -46,7 +46,14 @@ static bool check_next_four_addrs(const void* esp) {
   }
   return true;
 }
-
+static bool is_executable(char *file_name){
+  for(int i = 0;i<next_exec;i++){
+    if (exec_arr[i] != NULL && strcmp(file_name,exec_arr[i]) == 0){
+      return true;
+    }
+  }
+  return false;
+}
 
 void
 syscall_init (void) 
@@ -143,11 +150,24 @@ struct file* get_file_from_fd(int fd){
   }
   return fp;
 }
+char* get_file_name_from_fd(int fd){
+    if (fd < MIN_FD || fd > MAX_FD|| fd == NULL){
+    exit(-1);
+  }
+  struct thread* cur = thread_current();
+  char* file_name = cur->fd_to_file_name[fd];
+  if (file_name == NULL){
+    exit(-1);
+  }
+  return file_name;
+
+}
 
 void initialize_fd(struct thread* t){
   t->next_fd = 2;
     for(int fd=0;fd<=MAX_FD;fd++){
       t->fd_to_file[fd] = NULL;
+      t->fd_to_file_name[fd] = NULL;
   }
 }
 bool create (const char *file, unsigned initial_size){
@@ -181,6 +201,7 @@ if (fp ==NULL){
 }
 int fd = cur->next_fd;
 cur->fd_to_file[fd] = fp;
+cur->fd_to_file_name[fd] = file_name;
 cur->next_fd++;
 return fd;
 }
@@ -194,6 +215,7 @@ void close(int fd){
   file_close(fp);
   struct thread* cur = thread_current();
   cur->fd_to_file[fd] = NULL;
+  cur->fd_to_file_name[fd] = NULL;
 }
 
 int read (int fd, char *buffer, unsigned size){
@@ -204,7 +226,6 @@ int read (int fd, char *buffer, unsigned size){
     return size;
   }
   struct file* fp = get_file_from_fd(fd);
-  //file_deny_write(fp);
   int bytes_read = file_read (fp, buffer, size) ;
   return bytes_read;
 }
@@ -219,6 +240,14 @@ int write (int fd, const void *buffer, unsigned size){
      return size;
   }
   struct file* fp = get_file_from_fd(fd);
+  char* file_name = get_file_name_from_fd(fd);
+  if (is_executable(file_name)){
+    file_deny_write(fp);
+  }
+  else{
+    file_allow_write(fp);
+  }
+
   int bytes_written = file_write(fp,buffer,size);
   return bytes_written;
 }

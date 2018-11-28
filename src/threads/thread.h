@@ -101,7 +101,9 @@ struct thread
     bool is_parent_waiting;
     int exit_code;
     struct file* fd_to_file[101];
+    char* fd_to_file_name[101];
     int next_fd;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;  /* Page directory. */

@@ -2,6 +2,8 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+char* exec_arr[101];
+int next_exec;
 
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);

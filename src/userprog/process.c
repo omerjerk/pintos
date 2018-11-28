@@ -22,6 +22,15 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+void mark_not_executable(progName){
+  for(int i = 0;i<next_exec;i++){
+    if (exec_arr[i]!=NULL && strcmp(progName,exec_arr[i]) == 0){
+      exec_arr[i] = NULL;
+      return;
+    }
+  }
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -29,9 +38,10 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  
   char *fn_copy;
   tid_t tid;
-  /* Make a copy of FILE_NAME.
+  /* Make a copy of FILE_NAME
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
@@ -51,6 +61,8 @@ process_execute (const char *file_name)
       break;
   }
 
+  exec_arr[next_exec] = progName;
+  next_exec++;
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (progName, PRI_DEFAULT, start_process, fn_copy);
   struct thread* child_thread = get_thread_by_id(tid);
@@ -74,6 +86,7 @@ process_execute (const char *file_name)
       return -1;
     }
   }
+  
   return tid;
 }
 
@@ -175,7 +188,9 @@ process_exit (void)
     }
   add_exit_code(cur->tid, cur->exit_code);
   free_open_files(cur);
+  mark_not_executable(cur->name);
   printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
+  
 }
 
 /* Sets up the CPU for running user code in the current
