@@ -100,8 +100,8 @@ struct thread
     tid_t parent_tid;
     bool is_parent_waiting;
     int exit_code;
-    struct file* fd_to_file[101];
-    char* fd_to_file_name[101];
+    struct file* fd_to_file[129];
+    char* fd_to_file_name[129];
     int next_fd;
 
 #ifdef USERPROG

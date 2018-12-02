@@ -148,10 +148,11 @@ process_wait (tid_t child_tid)
 }
 
 /* Free the current process's resources. */
-void free_open_files(struct thread* t){
-  for (int fd = 0;fd <= 100;fd++){
+void close_open_files(struct thread* t){
+  for (int fd = 0;fd < t->next_fd;fd++){
       struct file* fp = t->fd_to_file[fd];
       if (fp != NULL){
+        //file_close(fp);
         free(fp);
       }
       
@@ -187,7 +188,7 @@ process_exit (void)
       pagedir_destroy (pd);
     }
   add_exit_code(cur->tid, cur->exit_code);
-  free_open_files(cur);
+  close_open_files(cur);
   mark_not_executable(cur->name);
   printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
   
