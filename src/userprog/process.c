@@ -74,7 +74,7 @@ process_execute (const char *file_name)
   sema_down(&child_thread->parent_exec_sema);
   if (get_thread_by_id(tid) == NULL) {
     int return_status = get_exit_code_by_id(tid, false);
-    if (return_status == -1) {
+    if (return_status == -5) {
       get_exit_code_by_id(tid, true);
       /*load failed*/
       //printf("derp1\n");
@@ -87,7 +87,7 @@ process_execute (const char *file_name)
     //  return tid;
     //}
   } else {
-    if (child_thread->exit_code == -1) {
+    if (child_thread->exit_code == -5) {
       //printf("derp2\n");
       return -1;
     }
@@ -195,7 +195,11 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  add_exit_code(cur->tid, cur->exit_code);
+  int temp_id = get_exit_code_by_id(cur->tid, false);
+  if (temp_id != -5) {
+    add_exit_code(cur->tid, cur->exit_code);
+  }
+  
   close_open_files(cur);
   mark_not_executable(cur->name);
   printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
@@ -429,7 +433,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!success) {
     t->exit_code = -1;
     //printf("load wasn't succesful\n");
-    add_exit_code(t->tid, -1);
+    add_exit_code(t->tid, -5);
     sema_up(&t->parent_exec_sema);
   } 
   

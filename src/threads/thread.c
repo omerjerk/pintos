@@ -393,7 +393,7 @@ void add_exit_code(tid_t tid, int exit_code) {
 }
 
 void print_size() {
-  //printf("exit code list size = %d\n", list_size(&exit_code_list));
+  printf("exit code list size = %d\n", list_size(&exit_code_list));
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

@@ -232,6 +232,7 @@ int filesize_handler(fd){
   lock_release(file_lock);
   return file_size;
 }
+
 void close_handler(int fd){
   struct file* fp = get_file_from_fd(fd);
   lock_acquire(file_lock);
