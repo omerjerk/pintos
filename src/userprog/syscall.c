@@ -179,6 +179,7 @@ void initialize_fd(struct thread* t){
       t->fd_to_file_name[fd] = NULL;
   }
 }
+
 bool create_handler (const char *file, unsigned initial_size){
   if (file == NULL||!check_next_four_addrs(file)){
     exit_handler(-1);
@@ -188,6 +189,7 @@ bool create_handler (const char *file, unsigned initial_size){
   lock_release(file_lock);
   return status;
 }
+
 bool remove_handler (const char *file){
   if (file == NULL||!check_next_four_addrs(file)){
     exit_handler(-1);
@@ -198,29 +200,31 @@ bool remove_handler (const char *file){
   return status;
 }
 
-int open_handler (const char *file_name){
-if (file_name == NULL ){
-  return -1;
+int open_handler (const char *file_name) {
+  if (file_name == NULL ){
+    return -1;
+  }
+  if( !check_next_four_addrs(file_name)) {
+    exit_handler(-1);
+    //return -1;
+  }
+  struct thread *cur = thread_current();
+  if (cur->next_fd == 0){
+    initialize_fd(cur);
+  }
+  lock_acquire(file_lock);
+  struct file* fp = filesys_open(file_name);
+  lock_release(file_lock);
+  if (fp ==NULL){
+    return -1;
+  }
+  int fd = cur->next_fd;
+  cur->fd_to_file[fd] = fp;
+  cur->fd_to_file_name[fd] = file_name;
+  cur->next_fd++;
+  return fd;
 }
-if( !check_next_four_addrs(file_name)){
-  exit_handler(-1);
-}
-struct thread *cur = thread_current();
-if (cur->next_fd == 0){
-  initialize_fd(cur);
-}
-lock_acquire(file_lock);
-struct file* fp = filesys_open(file_name);
-lock_release(file_lock);
-if (fp ==NULL){
-  return -1;
-}
-int fd = cur->next_fd;
-cur->fd_to_file[fd] = fp;
-cur->fd_to_file_name[fd] = file_name;
-cur->next_fd++;
-return fd;
-}
+
 int filesize_handler(fd){
   struct file* fp = get_file_from_fd(fd);
   lock_acquire(file_lock);

@@ -159,5 +159,6 @@ struct tid_exit_code {
 struct thread* get_thread_by_id(tid_t tid);
 int get_exit_code_by_id(tid_t tid, bool mark);
 void add_exit_code(tid_t tid, int exit_code);
+void print_size();
 
 #endif /* threads/thread.h */

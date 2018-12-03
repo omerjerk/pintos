@@ -60,19 +60,24 @@ process_execute (const char *file_name)
       progName = token;
       break;
   }
-
   exec_arr[next_exec] = progName;
-  next_exec++;
+  next_exec++; 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (progName, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR) {
+    palloc_free_page (fn_copy);
+    printf("unable to allocate more memory\n");
+    return -1;
+  }
+
   struct thread* child_thread = get_thread_by_id(tid);
   sema_down(&child_thread->parent_exec_sema);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
   if (get_thread_by_id(tid) == NULL) {
     int return_status = get_exit_code_by_id(tid, false);
-    if (return_status == -5) {
+    if (return_status == -1) {
+      get_exit_code_by_id(tid, true);
       /*load failed*/
+      //printf("derp1\n");
       return -1;
     }
     //printf("returning %d from execute\n", return_status);
@@ -82,11 +87,12 @@ process_execute (const char *file_name)
     //  return tid;
     //}
   } else {
-    if (child_thread->exit_code == -5) {
+    if (child_thread->exit_code == -1) {
+      //printf("derp2\n");
       return -1;
     }
   }
-  
+  //printf("returning tid = %d\n", tid); 
   return tid;
 }
 
@@ -135,16 +141,18 @@ process_wait (tid_t child_tid)
 {
   //printf("child id = %d\n", child_tid);
   struct thread* child = get_thread_by_id(child_tid);
+  int to_return = -1;
   if (child != NULL) {
     if (!child->is_parent_waiting) {
       child->is_parent_waiting = 1;
       sema_down(&child->parent_sema);
-      return get_exit_code_by_id(child_tid, true);
+      to_return = get_exit_code_by_id(child_tid, true);
     }
   } else {
-    return get_exit_code_by_id(child_tid, true);
+    to_return = get_exit_code_by_id(child_tid, true);
   }
-  return -1;
+  print_size();
+  return to_return;
 }
 
 /* Free the current process's resources. */
@@ -166,10 +174,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  if (cur->is_parent_waiting) {
+  //if (cur->is_parent_waiting) {
     sema_up(&cur->parent_sema);
     cur->is_parent_waiting = 0;
-  }
+  //}
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -326,13 +334,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
-      t->exit_code = -5;
-      add_exit_code(t->tid, -5);
-      sema_up(&t->parent_exec_sema);
+      //t->exit_code = -5;
+      //add_exit_code(t->tid, -5);
+      //sema_up(&t->parent_exec_sema);
       goto done; 
     }
   t->exit_code = 0;
-  sema_up(&t->parent_exec_sema);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -410,18 +417,21 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack (esp, args, argCount))
     goto done;
 
+  sema_up(&t->parent_exec_sema);
+
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
-  success = true;
-
+  success = true; 
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   if (!success) {
     t->exit_code = -1;
+    //printf("load wasn't succesful\n");
     add_exit_code(t->tid, -1);
-  }
+    sema_up(&t->parent_exec_sema);
+  } 
   
   return success;
 }

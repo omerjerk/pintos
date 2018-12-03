@@ -37,7 +37,6 @@ static pid_t
 spawn_child (int c, enum child_termination_mode mode)
 {
   char child_cmd[128];
-  msg("spawning");
   snprintf (child_cmd, sizeof child_cmd,
             "%s %d %s", test_name, c, mode == CRASH ? "-k" : "");
   return exec (child_cmd);
@@ -70,7 +69,9 @@ consume_some_resources_and_die (int seed)
   random_init (seed);
   volatile int *PHYS_BASE = (volatile int *)0xC0000000;
 
-  switch (random_ulong () % 5)
+  int crash_way = random_ulong() % 5;
+  //printf("crash way = %d\n", crash_way);
+  switch (crash_way)
     {
       case 0:
         *(volatile int *) NULL = 42;
@@ -132,6 +133,7 @@ main (int argc, char *argv[])
          spawned at a certain depth. */
       if (n > EXPECTED_DEPTH_TO_PASS/2)
         {
+          //printf("crashing child with depth = %d\n", n);
           child_pid = spawn_child (n + 1, CRASH);
           if (child_pid != -1)
             {
@@ -142,8 +144,9 @@ main (int argc, char *argv[])
              the next spawn_child below. */
         }
 
-      /* Now spawn the child that will recurse. */
+      /* Now spawn the child that will recurse. */   
       child_pid = spawn_child (n + 1, RECURSE);
+      printf("spawning child with depth = %d and id = %d\n", n, child_pid);
 
       /* If maximum depth is reached, return result. */
       if (child_pid == -1)
@@ -152,7 +155,7 @@ main (int argc, char *argv[])
       /* Else wait for child to report how deeply it was able to recurse. */
       int reached_depth = wait (child_pid);
       if (reached_depth == -1)
-        fail ("wait returned -1.");
+        fail ("wait returned -1 for child_pid = %d.", child_pid);
 
       /* Record the depth reached during the first run; on subsequent
          runs, fail if those runs do not match the depth achieved on the
