@@ -156,18 +156,20 @@ process_wait (tid_t child_tid)
 }
 
 /* Free the current process's resources. */
-void close_open_files(struct thread* t){
-  for (int fd = 0;fd < t->next_fd;fd++){
+void close_open_files(struct thread* t) {
+  int i = 0;
+  for (int fd = 0;fd < t->next_fd; fd++) {
       struct file* fp = t->fd_to_file[fd];
-      if (fp != NULL){
-        //file_close(fp);
-        free(fp);
+      if (fp != NULL) {
+        ++i;
+        file_close(fp);
+        t->fd_to_file[fd] = NULL;
       }
-      
   }
-  
-
+  if (i == 0)
+  printf("closed %i files for tid = %d\n", i, t->tid);
 }
+
 void
 process_exit (void)
 {
@@ -432,7 +434,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   if (!success) {
     t->exit_code = -1;
-    //printf("load wasn't succesful\n");
+    printf("load wasn't succesful\n");
     add_exit_code(t->tid, -5);
     sema_up(&t->parent_exec_sema);
   } 

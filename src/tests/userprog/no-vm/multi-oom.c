@@ -70,7 +70,7 @@ consume_some_resources_and_die (int seed)
   volatile int *PHYS_BASE = (volatile int *)0xC0000000;
 
   int crash_way = random_ulong() % 5;
-  //printf("crash way = %d\n", crash_way);
+  printf("crash way = %d\n", crash_way);
   switch (crash_way)
     {
       case 0:

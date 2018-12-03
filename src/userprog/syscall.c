@@ -14,23 +14,23 @@
 #include "threads/synch.h"
 #define MAX_FD 128
 #define MIN_FD 2
-struct lock file_lock_struct;
-struct lock* file_lock;
+
+static struct lock* file_lock;
 static void syscall_handler (struct intr_frame *);
 
 void halt_handler (void) NO_RETURN;
 static void exit_handler (int status) NO_RETURN;
 static tid_t exec_handler (const char *cmdline);
 static int wait_handler (tid_t);
-bool create_handler (const char *file, unsigned initial_size);
-bool remove_handler (const char *file);
-int open_handler (const char *file);
-int filesize_handler (int fd);
-int read_handler (int fd, char* buffer, unsigned size);
-int write_handler (int fd, const void *buffer, unsigned size);
-void seek_handler (int fd, unsigned position);
-unsigned tell (int fd);
-void close_handler (int fd);
+static bool create_handler (const char *file, unsigned initial_size);
+static bool remove_handler (const char *file);
+static int open_handler (const char *file);
+static int filesize_handler (int fd);
+static int read_handler (int fd, char* buffer, unsigned size);
+static int write_handler (int fd, const void *buffer, unsigned size);
+static void seek_handler (int fd, unsigned position);
+static unsigned tell (int fd);
+static void close_handler (int fd);
 
 static bool is_addr_ok(const void* addr) {
     if (is_user_vaddr(addr)) {
@@ -49,6 +49,7 @@ static bool check_next_four_addrs(const void* esp) {
   }
   return true;
 }
+
 static bool is_executable(char *file_name){
   for(int i = 0;i<next_exec;i++){
     if (exec_arr[i] != NULL && strcmp(file_name,exec_arr[i]) == 0){
@@ -57,10 +58,12 @@ static bool is_executable(char *file_name){
   }
   return false;
 }
-void initialize_file_lock(){
+
+static void initialize_file_lock(){
   file_lock = malloc(sizeof(struct lock));
   lock_init(file_lock);
 }
+
 void
 syscall_init (void) 
 {
@@ -70,7 +73,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  if(file_lock == NULL){
+  if (file_lock == NULL) {
     initialize_file_lock();
   }
   void *esp = f->esp;
@@ -148,7 +151,7 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
-struct file* get_file_from_fd(int fd){
+static struct file* get_file_from_fd(int fd){
   if (fd < MIN_FD || fd > MAX_FD|| fd == NULL){
     exit_handler(-1);
   }
@@ -159,7 +162,8 @@ struct file* get_file_from_fd(int fd){
   }
   return fp;
 }
-char* get_file_name_from_fd(int fd){
+
+static char* get_file_name_from_fd(int fd){
     if (fd < MIN_FD || fd > MAX_FD|| fd == NULL){
     exit_handler(-1);
   }
@@ -172,7 +176,7 @@ char* get_file_name_from_fd(int fd){
 
 }
 
-void initialize_fd(struct thread* t){
+static void initialize_fd(struct thread* t){
   t->next_fd = 2;
     for(int fd=0;fd<=MAX_FD;fd++){
       t->fd_to_file[fd] = NULL;
@@ -180,27 +184,27 @@ void initialize_fd(struct thread* t){
   }
 }
 
-bool create_handler (const char *file, unsigned initial_size){
+static bool create_handler (const char *file, unsigned initial_size){
   if (file == NULL||!check_next_four_addrs(file)){
     exit_handler(-1);
   }
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   bool status = filesys_create (file,initial_size);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   return status;
 }
 
-bool remove_handler (const char *file){
+static bool remove_handler (const char *file){
   if (file == NULL||!check_next_four_addrs(file)){
     exit_handler(-1);
   } 
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   bool status = filesys_remove(file);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   return status;
 }
 
-int open_handler (const char *file_name) {
+static int open_handler (const char *file_name) {
   if (file_name == NULL ){
     return -1;
   }
@@ -212,9 +216,9 @@ int open_handler (const char *file_name) {
   if (cur->next_fd == 0){
     initialize_fd(cur);
   }
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   struct file* fp = filesys_open(file_name);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   if (fp ==NULL){
     return -1;
   }
@@ -225,25 +229,25 @@ int open_handler (const char *file_name) {
   return fd;
 }
 
-int filesize_handler(fd){
+static int filesize_handler(fd){
   struct file* fp = get_file_from_fd(fd);
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   int file_size = file_length(fp);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   return file_size;
 }
 
-void close_handler(int fd){
+static void close_handler(int fd){
   struct file* fp = get_file_from_fd(fd);
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   file_close(fp);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   struct thread* cur = thread_current();
   cur->fd_to_file[fd] = NULL;
   cur->fd_to_file_name[fd] = NULL;
 }
 
-int read_handler (int fd, char *buffer, unsigned size){
+static int read_handler (int fd, char *buffer, unsigned size){
    if (buffer == NULL ||!check_next_four_addrs(buffer)){
       exit_handler(-1);
     }
@@ -251,13 +255,13 @@ int read_handler (int fd, char *buffer, unsigned size){
     return size;
   }
   struct file* fp = get_file_from_fd(fd);
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   int bytes_read = file_read (fp, buffer, size) ;
-  lock_release(file_lock);
+  //lock_release(file_lock);
   return bytes_read;
 }
 
-int write_handler (int fd, const void *buffer, unsigned size){ 
+static int write_handler (int fd, const void *buffer, unsigned size){ 
    if (buffer == NULL ||!check_next_four_addrs(buffer)){
       exit_handler(-1);
     }
@@ -275,17 +279,17 @@ int write_handler (int fd, const void *buffer, unsigned size){
   else{
     file_allow_write(fp);
   }
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   int bytes_written = file_write(fp,buffer,size);
-  lock_release(file_lock);
+  //lock_release(file_lock);
   return bytes_written;
 }
 
-void seek_handler(int fd,unsigned position){
+static void seek_handler(int fd,unsigned position){
   struct file* fp = get_file_from_fd(fd);
-  lock_acquire(file_lock);
+  //lock_acquire(file_lock);
   file_seek(fp,position); 
-  lock_release(file_lock);
+  //lock_release(file_lock);
 }
 
 static void exit_handler(int exit_code) { 
