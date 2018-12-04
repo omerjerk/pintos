@@ -14,6 +14,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "threads/malloc.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -27,6 +28,10 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+//added for proj2
+static struct list exit_code_list;
+static struct semaphore exit_code_sema;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -93,11 +98,17 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
+  /*proj 2 code*/
+  list_init(&exit_code_list);
+  sema_init(&exit_code_sema, 1);
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->exit_code = 0;
+  initial_thread->next_fd = 2;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -176,10 +187,14 @@ thread_create (const char *name, int priority,
 
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL) {
+    printf("can't create another thread\n");
     return TID_ERROR;
+  }
 
   /* Initialize thread. */
+  t->exit_code = 0;
+  t->next_fd = 2;
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
@@ -331,9 +346,60 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/*proj2 code*/
+struct thread* get_thread_by_id(tid_t tid) {
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    struct thread* t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid) {
+      return t;
+    }
+  }
+  return NULL;
+}
+
+int get_exit_code_by_id(tid_t tid, bool mark) {
+  struct list_elem *e;
+  sema_down(&exit_code_sema);
+  for (e = list_begin(&exit_code_list); e != list_end(&exit_code_list); e = list_next(e)) {
+    struct tid_exit_code* x = list_entry(e, struct tid_exit_code, elem);
+    if (x->tid == tid) {
+      int exit_code = x->exit_code;
+      if (mark) {
+        list_remove(&x->elem);
+        free(x);
+      }
+      sema_up(&exit_code_sema);
+      //printf("returning exit_code = %d for tid = %d\n", exit_code, tid);
+      return exit_code;
+    }
+  }
+  sema_up(&exit_code_sema);
+  return -1;
+}
+
+void add_exit_code(tid_t tid, int exit_code) {
+  sema_down(&exit_code_sema);
+  //printf("doing malloc ");
+  struct tid_exit_code* x = malloc(sizeof(struct tid_exit_code));
+  //printf("malloc done\n");
+  if (x == NULL) {
+    printf("malloc failed in add_exit_code\n");
+  }
+  //printf("adding exit_code = %d for tid = %d\n", exit_code, tid);
+  x->tid = tid;
+  x->exit_code = exit_code;
+  list_push_back (&exit_code_list, &x->elem);
+  sema_up(&exit_code_sema);
+}
+
+void print_size() {
+  //printf("exit code list size = %d\n", list_size(&exit_code_list));
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
 }
@@ -467,6 +533,11 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
+
+  /*proj2 code*/
+  sema_init(&t->parent_sema, 0);
+  sema_init(&t->parent_exec_sema, 0);
+  t->exit_code = 0; //0 is the default exit code unless modified
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

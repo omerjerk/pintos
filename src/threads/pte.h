@@ -76,7 +76,10 @@ static inline uint32_t pde_create (uint32_t *pt) {
 /* Returns a pointer to the page table that page directory entry
    PDE, which must "present", points to. */
 static inline uint32_t *pde_get_pt (uint32_t pde) {
-  ASSERT (pde & PTE_P);
+  if (!(pde & PTE_P)) {
+    debug_backtrace(); 
+  }
+  ASSERT (pde & PTE_P); 
   return ptov (pde & PTE_ADDR);
 }
 
