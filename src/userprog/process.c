@@ -66,6 +66,7 @@ process_execute (const char *file_name)
   tid = thread_create (progName, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+    palloc_free_page(temp);
     printf("unable to allocate more memory\n");
     return -1;
   }
@@ -76,8 +77,7 @@ process_execute (const char *file_name)
     int return_status = get_exit_code_by_id(tid, false);
     if (return_status == -5) {
       get_exit_code_by_id(tid, true);
-      /*load failed*/
-      //printf("derp1\n");
+      palloc_free_page(temp);
       return -1;
     }
     //printf("returning %d from execute\n", return_status);
@@ -88,11 +88,11 @@ process_execute (const char *file_name)
     //}
   } else {
     if (child_thread->exit_code == -5) {
-      //printf("derp2\n");
+      palloc_free_page(temp);
       return -1;
     }
   }
-  //printf("returning tid = %d\n", tid); 
+  palloc_free_page(temp);
   return tid;
 }
 
@@ -166,8 +166,6 @@ void close_open_files(struct thread* t) {
         t->fd_to_file[fd] = NULL;
       }
   }
-  if (i == 0)
-  printf("closed %i files for tid = %d\n", i, t->tid);
 }
 
 void
@@ -431,10 +429,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   success = true; 
  done:
   /* We arrive here whether the load is successful or not. */
+  palloc_free_page(fn_copy);
   file_close (file);
   if (!success) {
     t->exit_code = -1;
-    printf("load wasn't succesful\n");
     add_exit_code(t->tid, -5);
     sema_up(&t->parent_exec_sema);
   } 
